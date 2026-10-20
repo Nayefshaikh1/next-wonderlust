@@ -26,7 +26,6 @@ interface NavbarProps {
 export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterState>({
     destination: "",
@@ -277,24 +276,13 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
 
                       <button
                         onClick={() => {
-                          setAuthMode("register");
                           setAuthModalOpen(true);
                           setIsMenuOpen(false);
                         }}
-                        className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition"
+                        className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer"
                       >
-                        Sign up
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setAuthMode("login");
-                          setAuthModalOpen(true);
-                          setIsMenuOpen(false);
-                        }}
-                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition font-medium"
-                      >
-                        Log in
+                        <span>Log in</span>
+                        <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Admin & Host</span>
                       </button>
                     </>
                   )}
@@ -419,24 +407,13 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
 
                   <button
                     onClick={() => {
-                      setAuthMode("register");
                       setAuthModalOpen(true);
                       setIsMenuOpen(false);
                     }}
-                    className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition"
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer"
                   >
-                    Sign up
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setAuthMode("login");
-                      setAuthModalOpen(true);
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition font-medium"
-                  >
-                    Log in
+                    <span>Log in</span>
+                    <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Admin & Host</span>
                   </button>
                 </>
               )}
@@ -479,7 +456,6 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
       {/* Auth Modal */}
       <AuthModal
         isOpen={authModalOpen}
-        mode={authMode}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={() => {
           setAuthModalOpen(false);

@@ -43,6 +43,7 @@ export default function MapView({
 
   useEffect(() => {
     let isMounted = true;
+    let resizeTimer: NodeJS.Timeout;
 
     async function initMap() {
       if (!mapContainerRef.current) return;
@@ -50,11 +51,13 @@ export default function MapView({
       // Dynamically import Leaflet so window is always available
       const L = (await import("leaflet")).default;
 
-      if (!isMounted) return;
+      if (!isMounted || !mapContainerRef.current) return;
 
       // Clean up previous instance if any
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch {}
         mapInstanceRef.current = null;
       }
 
@@ -83,7 +86,7 @@ export default function MapView({
             : getCoordinatesForLocation(first.location, first.country);
         initialLat = coords.lat;
         initialLng = coords.lng;
-        initialZoom = 4;
+        initialZoom = 3;
       }
 
       // Initialize map instance
@@ -97,17 +100,21 @@ export default function MapView({
       // Add zoom control top-right
       L.control.zoom({ position: "topright" }).addTo(map);
 
-      // Add CartoDB Voyager tiles (clean, modern Apple Maps/Airbnb style)
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        {
-          maxZoom: 19,
-          subdomains: "abcd",
-        }
-      ).addTo(map);
+      // OpenStreetMap Tiles (Universal 100% Uptime & No Key Required)
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
 
       mapInstanceRef.current = map;
       markersRef.current = [];
+
+      // Schedule invalidateSize after layout settled
+      resizeTimer = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      }, 250);
 
       // Single listing mode
       if (singleListing) {
@@ -118,7 +125,7 @@ export default function MapView({
 
         // Circular neighborhood area
         L.circle([coords.lat, coords.lng], {
-          radius: 650,
+          radius: 750,
           color: "#FF385C",
           fillColor: "#FF385C",
           fillOpacity: 0.15,
@@ -160,7 +167,7 @@ export default function MapView({
             : listing.price;
 
           const priceHtml = `
-            <div class="airbnb-price-marker font-semibold tracking-tight" id="marker-${listing._id}">
+            <div class="airbnb-price-marker font-semibold tracking-tight cursor-pointer" id="marker-${listing._id}">
               $${displayedPrice}
             </div>
           `;
@@ -178,7 +185,10 @@ export default function MapView({
 
           marker.on("click", () => {
             setActiveListing(listing);
-            map.panTo([coords.lat, coords.lng], { animate: true, duration: 0.5 });
+            map.flyTo([coords.lat, coords.lng], Math.max(map.getZoom(), 8), {
+              animate: true,
+              duration: 0.8,
+            });
             if (onMarkerClick) {
               onMarkerClick(listing._id);
             }
@@ -189,39 +199,54 @@ export default function MapView({
         });
 
         if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
         }
       }
     }
 
     initMap();
 
+    const handleWindowResize = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    };
+    window.addEventListener("resize", handleWindowResize);
+
     return () => {
       isMounted = false;
+      clearTimeout(resizeTimer);
+      window.removeEventListener("resize", handleWindowResize);
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch {}
         mapInstanceRef.current = null;
       }
     };
   }, [listings, singleListing, center, zoom, showTaxes, onMarkerClick]);
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm ${className}`}>
-      <div ref={mapContainerRef} className="w-full h-full min-h-[420px] z-0" />
+    <div className={`relative overflow-hidden rounded-3xl border border-gray-200 shadow-md ${className}`}>
+      <div
+        ref={mapContainerRef}
+        className="w-full h-full min-h-[450px] z-0"
+        style={{ width: "100%", height: "100%", minHeight: "450px" }}
+      />
 
       {/* Floating Active Listing Preview Card (Airbnb Style) */}
       {activeListing && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[90%] max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 p-3.5 flex gap-3.5 items-center transition-all animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] w-[92%] max-w-sm bg-white rounded-3xl shadow-2xl border border-gray-100 p-3.5 flex gap-3.5 items-center transition-all animate-in fade-in slide-in-from-bottom-4 duration-300">
           <button
             onClick={() => setActiveListing(null)}
-            className="absolute -top-2.5 -right-2.5 bg-white border border-gray-200 text-gray-500 hover:text-black rounded-full p-1 shadow-md hover:scale-105 transition-transform"
+            className="absolute -top-2.5 -right-2.5 bg-white border border-gray-200 text-gray-500 hover:text-black rounded-full p-1.5 shadow-md hover:scale-105 transition cursor-pointer"
             aria-label="Close preview"
           >
             <X size={14} />
           </button>
 
           {/* Thumbnail */}
-          <div className="relative w-24 h-24 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+          <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-gray-100">
             <Image
               src={activeListing.image.url}
               alt={activeListing.title}
@@ -249,7 +274,7 @@ export default function MapView({
               )}
             </div>
 
-            <h4 className="text-sm font-semibold text-gray-900 truncate mb-1">
+            <h4 className="text-sm font-bold text-gray-900 truncate mb-1">
               {activeListing.title}
             </h4>
 
@@ -261,7 +286,7 @@ export default function MapView({
 
               <Link
                 href={`/listings/${activeListing._id}`}
-                className="text-xs font-semibold text-white bg-[#FF385C] hover:bg-[#E00B41] px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+                className="text-xs font-bold text-white bg-[#FF385C] hover:bg-[#E00B41] px-3.5 py-1.5 rounded-xl flex items-center gap-1 transition shadow-sm hover:scale-105"
               >
                 View
                 <ArrowUpRight size={13} />

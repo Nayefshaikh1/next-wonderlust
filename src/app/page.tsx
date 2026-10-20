@@ -33,12 +33,12 @@ export default function WonderlustHome() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalListings, setTotalListings] = useState(0);
-  const limit = 8;
+  const [limit, setLimit] = useState(8);
 
   const contentTopRef = useRef<HTMLDivElement>(null);
 
   const fetchListings = useCallback(
-    async (pageToFetch = 1) => {
+    async (pageToFetch = 1, currentLimit = limit) => {
       setIsLoading(true);
       try {
         const url = new URL("/api/listings", window.location.origin);
@@ -62,7 +62,7 @@ export default function WonderlustHome() {
         }
 
         url.searchParams.set("page", pageToFetch.toString());
-        url.searchParams.set("limit", limit.toString());
+        url.searchParams.set("limit", currentLimit.toString());
 
         const res = await fetch(url.toString());
         const data = await res.json();
@@ -153,6 +153,12 @@ export default function WonderlustHome() {
     } else {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setCurrentPage(1);
+    fetchListings(1, newLimit);
   };
 
   const handleSeedData = async () => {
@@ -309,6 +315,7 @@ export default function WonderlustHome() {
             totalListings={totalListings}
             limit={limit}
             onPageChange={handlePageChange}
+            onLimitChange={handleLimitChange}
           />
         ) : (
           <div className="max-w-[2520px] mx-auto xl:px-20 md:px-10 sm:px-4 px-4 py-4">
