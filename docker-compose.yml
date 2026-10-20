@@ -1,0 +1,48 @@
+services:
+  # Next.js Application (Mapped to host port 3001)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/wonderlust
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dpkb3zfq4
+      - CLOUDINARY_API_KEY=185497795391743
+      - CLOUDINARY_API_SECRET=FMBJ_g3NlpaJwxjSMeBMSYXJdhg
+      - NEXT_PUBLIC_MAPTILER_KEY=M0zl0UMBnQpmCrDECyyV
+      - JWT_SECRET=gfgjkkiugjhfg
+    depends_on:
+      - mongo
+      - redis
+    restart: always
+
+  # Redis Cache Container (Mapped to host port 6380 to avoid host port conflicts)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  # MongoDB Container (Mapped to host port 27018 to avoid host port conflicts)
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: always
+
+volumes:
+  mongo_data:
+  redis_data:
