@@ -5,6 +5,8 @@ import Review from "@/lib/models/Review";
 import { INITIAL_LISTINGS } from "@/lib/seed-data";
 import { deleteCache } from "@/lib/redis";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
   try {
     await connectToDatabase();
@@ -13,25 +15,30 @@ export async function POST() {
     await Listing.deleteMany({});
     await Review.deleteMany({});
 
-    const createdListings = [];
+    const reviewsToInsert: InstanceType<typeof Review>[] = [];
+    const listingsToInsert = [];
 
     for (const item of INITIAL_LISTINGS) {
-      // Create reviews first
       const reviewIds = [];
       if (item.reviews && item.reviews.length > 0) {
         for (const rev of item.reviews) {
-          const newRev = await Review.create(rev);
-          reviewIds.push(newRev._id);
+          const revDoc = new Review(rev);
+          reviewsToInsert.push(revDoc);
+          reviewIds.push(revDoc._id);
         }
       }
 
-      const newListing = await Listing.create({
+      listingsToInsert.push({
         ...item,
         reviews: reviewIds,
       });
-
-      createdListings.push(newListing);
     }
+
+    if (reviewsToInsert.length > 0) {
+      await Review.insertMany(reviewsToInsert);
+    }
+
+    const createdListings = await Listing.insertMany(listingsToInsert);
 
     // Invalidate Redis caches
     await deleteCache("listings:*");
@@ -39,7 +46,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Database successfully seeded with ${createdListings.length} Airbnb listings!`,
+      message: `Database successfully seeded with ${createdListings.length} Wonderlust listings!`,
       count: createdListings.length,
     });
   } catch (error) {

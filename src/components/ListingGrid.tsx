@@ -112,7 +112,7 @@ export default function ListingGrid({
               <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 px-3 py-1 rounded-full">
                 <Layers className="w-3.5 h-3.5 text-gray-400" />
                 <span>Per page:</span>
-                {[6, 8, 12].map((opt) => (
+                {[15, 30, 45].map((opt) => (
                   <button
                     key={opt}
                     onClick={() => onLimitChange(opt)}

@@ -33,7 +33,7 @@ export default function WonderlustHome() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalListings, setTotalListings] = useState(0);
-  const [limit, setLimit] = useState(8);
+  const [limit, setLimit] = useState(15);
 
   const contentTopRef = useRef<HTMLDivElement>(null);
 

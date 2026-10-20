@@ -26,6 +26,7 @@ interface NavbarProps {
 export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "signup">("login");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterState>({
     destination: "",
@@ -265,24 +266,28 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
                     </>
                   ) : (
                     <>
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
-                        Host Dashboard
-                      </Link>
-
                       <button
                         onClick={() => {
+                          setAuthModalMode("login");
                           setAuthModalOpen(true);
                           setIsMenuOpen(false);
                         }}
                         className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer"
                       >
                         <span>Log in</span>
-                        <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Admin & Host</span>
+                        <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Sign in</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setAuthModalMode("signup");
+                          setAuthModalOpen(true);
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer border-t border-gray-100"
+                      >
+                        <span>Sign up</span>
+                        <span className="text-[10px] text-gray-400">New user</span>
                       </button>
                     </>
                   )}
@@ -404,16 +409,28 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
                 </>
               ) : (
                 <>
-
                   <button
                     onClick={() => {
+                      setAuthModalMode("login");
                       setAuthModalOpen(true);
                       setIsMenuOpen(false);
                     }}
                     className="w-full text-left px-4 py-3 text-sm font-bold text-gray-900 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer"
                   >
                     <span>Log in</span>
-                    <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Admin & Host</span>
+                    <span className="text-[10px] bg-rose-50 text-[#ff385c] font-bold px-2 py-0.5 rounded-full">Sign in</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setAuthModalMode("signup");
+                      setAuthModalOpen(true);
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition flex items-center justify-between cursor-pointer border-t border-gray-100"
+                  >
+                    <span>Sign up</span>
+                    <span className="text-[10px] text-gray-400">New user</span>
                   </button>
                 </>
               )}
@@ -456,6 +473,7 @@ export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
       {/* Auth Modal */}
       <AuthModal
         isOpen={authModalOpen}
+        initialMode={authModalMode}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={() => {
           setAuthModalOpen(false);

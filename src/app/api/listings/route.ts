@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     const maxPrice = searchParams.get("maxPrice");
     const amenities = searchParams.get("amenities");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "8", 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "15", 10)));
     const fetchAll = searchParams.get("all") === "true";
 
     // Cache key based on query params & pagination
@@ -216,13 +216,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       source: "error_fallback",
-      listings: MOCK_FALLBACK_LISTINGS.slice(0, 12),
+      listings: MOCK_FALLBACK_LISTINGS.slice(0, 15),
       pagination: {
         currentPage: 1,
-        totalPages: Math.ceil(MOCK_FALLBACK_LISTINGS.length / 12),
+        totalPages: Math.ceil(MOCK_FALLBACK_LISTINGS.length / 15),
         totalListings: MOCK_FALLBACK_LISTINGS.length,
         hasMore: true,
-        limit: 12,
+        limit: 15,
       },
     });
   }
