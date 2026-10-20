@@ -154,6 +154,16 @@ export async function POST(req: NextRequest) {
       owner: user?.userId,
     });
 
+    // If the creator is a regular user, elevate their role to owner
+    if (user && user.userId) {
+      const User = (await import("@/lib/models/User")).default;
+      const creator = await User.findById(user.userId);
+      if (creator && creator.role === "user") {
+        creator.role = "owner";
+        await creator.save();
+      }
+    }
+
     // Invalidate Redis caches
     await deleteCache("listings:*");
 

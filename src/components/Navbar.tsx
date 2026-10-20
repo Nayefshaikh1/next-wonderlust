@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Menu, User, Heart, LogOut, Compass as AppLogo, LayoutDashboard, Compass, Home } from "lucide-react";
+import { Search, Menu, User, Heart, LogOut, Compass as AppLogo, LayoutDashboard, Compass, Home, ShieldCheck } from "lucide-react";
 import AuthModal from "./AuthModal";
 
 interface NavbarProps {
@@ -13,7 +13,13 @@ export default function Navbar({ onSearch }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [currentUser, setCurrentUser] = useState<{ username: string; email: string; avatar?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id?: string;
+    username: string;
+    email: string;
+    avatar?: string;
+    role?: "admin" | "owner" | "user";
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
@@ -114,18 +120,42 @@ export default function Navbar({ onSearch }: NavbarProps) {
                   {currentUser ? (
                     <>
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="text-sm font-bold text-gray-900">{currentUser.username}</p>
-                        <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-gray-900">{currentUser.username}</p>
+                          {currentUser.role === "admin" && (
+                            <span className="bg-red-50 text-[#ff385c] text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-red-200">
+                              ADMIN
+                            </span>
+                          )}
+                          {currentUser.role === "owner" && (
+                            <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                              HOST
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">{currentUser.email}</p>
                       </div>
 
-                      <Link
-                        href="/dashboard"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
-                      >
-                        <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
-                        Host Dashboard
-                      </Link>
+                      {/* Dashboard visible ONLY for Admin and Owner */}
+                      {(currentUser.role === "admin" || currentUser.role === "owner") && (
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
+                        >
+                          {currentUser.role === "admin" ? (
+                            <>
+                              <ShieldCheck className="w-4 h-4 text-[#ff385c]" />
+                              Admin Dashboard
+                            </>
+                          ) : (
+                            <>
+                              <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
+                              Host Dashboard
+                            </>
+                          )}
+                        </Link>
+                      )}
 
                       <Link
                         href="/trips"
@@ -240,18 +270,42 @@ export default function Navbar({ onSearch }: NavbarProps) {
               {currentUser ? (
                 <>
                   <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="text-sm font-bold text-gray-900">{currentUser.username}</p>
-                    <p className="text-xs text-gray-500 truncate">{currentUser.email}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-bold text-gray-900">{currentUser.username}</p>
+                      {currentUser.role === "admin" && (
+                        <span className="bg-red-50 text-[#ff385c] text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-red-200">
+                          ADMIN
+                        </span>
+                      )}
+                      {currentUser.role === "owner" && (
+                        <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                          HOST
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{currentUser.email}</p>
                   </div>
 
-                  <Link
-                    href="/dashboard"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
-                    Host Dashboard
-                  </Link>
+                  {/* Dashboard visible ONLY for Admin and Owner */}
+                  {(currentUser.role === "admin" || currentUser.role === "owner") && (
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setIsMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
+                    >
+                      {currentUser.role === "admin" ? (
+                        <>
+                          <ShieldCheck className="w-4 h-4 text-[#ff385c]" />
+                          Admin Dashboard
+                        </>
+                      ) : (
+                        <>
+                          <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
+                          Host Dashboard
+                        </>
+                      )}
+                    </Link>
+                  )}
 
                   <Link
                     href="/trips"
@@ -283,14 +337,6 @@ export default function Navbar({ onSearch }: NavbarProps) {
                 </>
               ) : (
                 <>
-                  <Link
-                    href="/dashboard"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-4 py-3 text-sm text-gray-900 hover:bg-rose-50 transition font-bold text-[#ff385c]"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-[#ff385c]" />
-                    Host Dashboard
-                  </Link>
 
                   <button
                     onClick={() => {

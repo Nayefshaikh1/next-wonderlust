@@ -5,6 +5,7 @@ import "@/lib/models/Review"; // ensure model is registered
 import { getCache, setCache, deleteCache } from "@/lib/redis";
 import { INITIAL_LISTINGS } from "@/lib/seed-data";
 import { getCoordinatesForLocation } from "@/lib/geo";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -77,14 +78,40 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const session = await getCurrentUser();
+
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized. Please log in." }, { status: 401 });
+    }
+
+    if (session.role === "user") {
+      return NextResponse.json(
+        { success: false, error: "Access denied. Regular users cannot edit listings." },
+        { status: 403 }
+      );
+    }
+
     await connectToDatabase();
-    const body = await req.json();
+    const existingListing = await Listing.findById(id);
 
-    const updatedListing = await Listing.findByIdAndUpdate(id, body, { new: true }).populate("reviews");
-
-    if (!updatedListing) {
+    if (!existingListing) {
       return NextResponse.json({ success: false, error: "Listing not found" }, { status: 404 });
     }
+
+    // Admin can edit any listing. Owner can only edit their own.
+    if (
+      session.role === "owner" &&
+      existingListing.owner &&
+      existingListing.owner.toString() !== session.userId
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden. Hosts can only edit their own listings." },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    const updatedListing = await Listing.findByIdAndUpdate(id, body, { new: true }).populate("reviews");
 
     // Invalidate Redis cache
     await deleteCache(`listing:${id}`);
@@ -103,13 +130,39 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const session = await getCurrentUser();
+
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized. Please log in." }, { status: 401 });
+    }
+
+    if (session.role === "user") {
+      return NextResponse.json(
+        { success: false, error: "Access denied. Regular users cannot delete listings." },
+        { status: 403 }
+      );
+    }
+
     await connectToDatabase();
+    const existingListing = await Listing.findById(id);
 
-    const deletedListing = await Listing.findByIdAndDelete(id);
-
-    if (!deletedListing) {
+    if (!existingListing) {
       return NextResponse.json({ success: false, error: "Listing not found" }, { status: 404 });
     }
+
+    // Admin can delete any listing. Owner can only delete their own.
+    if (
+      session.role === "owner" &&
+      existingListing.owner &&
+      existingListing.owner.toString() !== session.userId
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden. Hosts can only delete their own listings." },
+        { status: 403 }
+      );
+    }
+
+    await Listing.findByIdAndDelete(id);
 
     // Invalidate Redis cache
     await deleteCache(`listing:${id}`);

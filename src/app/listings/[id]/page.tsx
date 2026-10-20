@@ -29,12 +29,14 @@ interface SingleListing {
   amenities?: string[];
   host?: { name: string; isSuperhost?: boolean; avatar?: string };
   reviews?: ReviewItem[];
+  owner?: string;
 }
 
 export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
   const [listing, setListing] = useState<SingleListing | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role?: "admin" | "owner" | "user" } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -69,6 +71,13 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     const loadData = async () => {
       if (isMounted) {
         await fetchListingDetail();
+        try {
+          const userRes = await fetch("/api/auth/me");
+          const userData = await userRes.json();
+          if (userData.success && userData.user && isMounted) {
+            setCurrentUser(userData.user);
+          }
+        } catch {}
       }
     };
     loadData();
@@ -76,6 +85,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       isMounted = false;
     };
   }, [fetchListingDetail]);
+
+  const canManage = Boolean(
+    currentUser &&
+      (currentUser.role === "admin" ||
+        (currentUser.role === "owner" && listing?.owner && String(listing.owner) === String(currentUser.id)))
+  );
 
   const handleDeleteListing = async () => {
     try {
@@ -175,22 +190,26 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 {saved ? "Saved" : "Save"}
               </button>
 
-              {/* Edit / Delete Buttons */}
-              <Link
-                href={`/listings/${listing._id}/edit`}
-                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 px-3.5 py-2 rounded-full transition shadow-2xs active:scale-95"
-              >
-                <Edit className="w-4 h-4 text-gray-700" />
-                Edit
-              </Link>
+              {/* Edit / Delete Buttons (Admin or Listing Owner Only) */}
+              {canManage && (
+                <>
+                  <Link
+                    href={`/listings/${listing._id}/edit`}
+                    className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 px-3.5 py-2 rounded-full transition shadow-2xs active:scale-95"
+                  >
+                    <Edit className="w-4 h-4 text-gray-700" />
+                    Edit
+                  </Link>
 
-              <button
-                onClick={() => setDeleteConfirm(true)}
-                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-2 rounded-full transition shadow-2xs active:scale-95"
-              >
-                <Trash2 className="w-4 h-4 text-rose-600" />
-                Delete
-              </button>
+                  <button
+                    onClick={() => setDeleteConfirm(true)}
+                    className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-2 rounded-full transition shadow-2xs active:scale-95"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    Delete
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

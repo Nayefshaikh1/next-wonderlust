@@ -6,7 +6,7 @@ import Image from "next/image";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CATEGORIES } from "@/components/CategoryBar";
-import { Save, Image as ImageIcon } from "lucide-react";
+import { Save, Image as ImageIcon, ShieldAlert } from "lucide-react";
 
 export default function EditListingPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -23,13 +23,21 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const [isAuthorized, setIsAuthorized] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch(`/api/listings/${resolvedParams.id}`);
-        const data = await res.json();
-        if (data.success && data.listing) {
-          const l = data.listing;
+        const [listingRes, userRes] = await Promise.all([
+          fetch(`/api/listings/${resolvedParams.id}`),
+          fetch("/api/auth/me"),
+        ]);
+
+        const listingData = await listingRes.json();
+        const userData = await userRes.json();
+
+        if (listingData.success && listingData.listing) {
+          const l = listingData.listing;
           setTitle(l.title || "");
           setDescription(l.description || "");
           setPrice(l.price?.toString() || "");
@@ -37,6 +45,17 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
           setLocation(l.location || "");
           setCountry(l.country || "");
           setImageUrl(l.image?.url || "");
+
+          const currentUser = userData.success ? userData.user : null;
+          if (
+            currentUser &&
+            (currentUser.role === "admin" ||
+              (currentUser.role === "owner" && l.owner && String(l.owner) === String(currentUser.id)))
+          ) {
+            setIsAuthorized(true);
+          } else {
+            setIsAuthorized(false);
+          }
         }
       } catch {
         setErrorMessage("Failed to load listing for edit");
@@ -88,6 +107,34 @@ export default function EditListingPage({ params }: { params: Promise<{ id: stri
           <div className="h-8 bg-gray-200 rounded-md w-1/2" />
           <div className="h-64 bg-gray-200 rounded-2xl" />
         </div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="bg-white border border-gray-200 rounded-3xl p-8 max-w-md w-full text-center shadow-xl space-y-4">
+            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">Access Restricted</h2>
+            <p className="text-sm text-gray-500">
+              You do not have permission to edit this listing. Only the property host or an administrator can make changes.
+            </p>
+            <div className="pt-2">
+              <button
+                onClick={() => router.push(`/listings/${resolvedParams.id}`)}
+                className="w-full py-3 bg-gray-900 hover:bg-black text-white text-sm font-semibold rounded-xl transition shadow"
+              >
+                Back to Listing
+              </button>
+            </div>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }

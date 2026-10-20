@@ -8,6 +8,7 @@ export interface UserPayload {
   email: string;
   username: string;
   avatar?: string;
+  role?: "admin" | "owner" | "user";
 }
 
 export function signToken(payload: UserPayload): string {

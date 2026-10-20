@@ -18,6 +18,7 @@ import {
   Eye,
   MapPin,
   Users,
+  User,
   Compass,
   ArrowUpRight,
   ShieldCheck,
@@ -67,10 +68,25 @@ interface MonthlyData {
   bookingsCount: number;
 }
 
+interface ManagedUser {
+  _id: string;
+  username: string;
+  email: string;
+  role: "admin" | "owner" | "user";
+  createdAt: string;
+  avatar?: string;
+}
+
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "reservations" | "trips">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "listings" | "reservations" | "trips" | "users">("overview");
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [role, setRole] = useState<"admin" | "owner" | "user" | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [accessDenied, setAccessDenied] = useState<string | null>(null);
+  const [usersList, setUsersList] = useState<ManagedUser[]>([]);
+  const [updatingUserRole, setUpdatingUserRole] = useState<string | null>(null);
+  const [userRoleMessage, setUserRoleMessage] = useState<string | null>(null);
   const [userListings, setUserListings] = useState<EditableListing[]>([]);
   const [receivedBookings, setReceivedBookings] = useState<ReceivedBooking[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,19 +100,43 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let isMounted = true;
+
+    const fetchUsersList = async () => {
+      try {
+        const res = await fetch("/api/admin/users");
+        const data = await res.json();
+        if (data.success && isMounted) {
+          setUsersList(data.users || []);
+        }
+      } catch (err) {
+        console.error("Dashboard fetch users error:", err);
+      }
+    };
+
     const fetchDashboardData = async () => {
       try {
         const res = await fetch("/api/dashboard/stats");
         const data = await res.json();
-        if (isMounted && data.success) {
-          setStats(data.stats);
-          setUserListings(data.userListings || []);
-          setReceivedBookings(data.receivedBookings || []);
-          setMyTrips(data.myTrips || []);
-          setMonthlyData(data.monthlyData || []);
+        if (isMounted) {
+          if (data.success) {
+            setStats(data.stats);
+            setRole(data.role);
+            setIsAdmin(data.isAdmin || data.role === "admin");
+            setUserListings(data.userListings || []);
+            setReceivedBookings(data.receivedBookings || []);
+            setMyTrips(data.myTrips || []);
+            setMonthlyData(data.monthlyData || []);
+
+            if (data.isAdmin || data.role === "admin") {
+              fetchUsersList();
+            }
+          } else {
+            setAccessDenied(data.error || "Access denied. Dashboard is restricted to Hosts and Administrators.");
+          }
         }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
+        if (isMounted) setAccessDenied("Failed to load dashboard. Please log in.");
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -107,6 +147,32 @@ export default function DashboardPage() {
       isMounted = false;
     };
   }, []);
+
+  const handleRoleChange = async (userId: string, newRole: "admin" | "owner" | "user") => {
+    setUpdatingUserRole(userId);
+    setUserRoleMessage(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUserRoleMessage(data.message || `Role updated to ${newRole}`);
+        setUsersList((prev) =>
+          prev.map((u) => (u._id === userId ? { ...u, role: newRole } : u))
+        );
+        setTimeout(() => setUserRoleMessage(null), 3000);
+      } else {
+        alert(data.error || "Failed to update role");
+      }
+    } catch {
+      alert("Error updating role");
+    } finally {
+      setUpdatingUserRole(null);
+    }
+  };
 
   const handleDeleteListing = async (listingId: string) => {
     if (!confirm("Are you sure you want to delete this listing? This action cannot be undone.")) {
@@ -139,6 +205,39 @@ export default function DashboardPage() {
 
   const maxMonthlyRevenue = Math.max(...monthlyData.map((d) => d.revenue), 1000);
 
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-[#F7F7F7] flex flex-col font-sans">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-gray-200 shadow-xl text-center space-y-5 animate-in fade-in zoom-in-95">
+            <div className="w-16 h-16 bg-red-50 text-[#ff385c] rounded-full mx-auto flex items-center justify-center">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-extrabold text-gray-900">Access Restricted</h2>
+              <p className="text-sm text-gray-600 leading-relaxed font-medium">
+                {accessDenied}
+              </p>
+              <p className="text-xs text-gray-400">
+                Regular guests are not authorized to view dashboard statistics or modify system settings.
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/"
+                className="w-full inline-block bg-[#222222] hover:bg-black text-white py-3 px-6 rounded-xl text-sm font-bold transition shadow-md"
+              >
+                Return to Explore Stays
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       <Navbar />
@@ -152,13 +251,15 @@ export default function DashboardPage() {
           <div className="space-y-2 relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-rose-300 text-xs font-semibold backdrop-blur-md">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              Verified Wonderlust Host
+              {isAdmin ? "Full Administrator Control" : "Verified Host Operations"}
             </div>
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-              Host Performance & Operations
+              {isAdmin ? "Admin Control Center" : "Host Performance & Operations"}
             </h1>
             <p className="text-gray-300 text-sm max-w-xl">
-              Manage your luxury properties, inspect guest reservations, monitor earnings, and stay in control of your hospitality business.
+              {isAdmin
+                ? "Platform-wide management. You can inspect all listings, manage global reservations, view platform revenue, and promote users to Admin."
+                : "Manage your personal properties, inspect guest reservations, monitor earnings, and stay in control of your hospitality business."}
             </p>
           </div>
 
@@ -269,7 +370,7 @@ export default function DashboardPage() {
             }`}
           >
             <Home className="w-4 h-4" />
-            My Hosted Properties ({userListings.length})
+            {isAdmin ? "All Platform Properties" : "My Hosted Properties"} ({userListings.length})
           </button>
 
           <button
@@ -281,7 +382,7 @@ export default function DashboardPage() {
             }`}
           >
             <CalendarCheck className="w-4 h-4" />
-            Guest Reservations ({receivedBookings.length})
+            {isAdmin ? "All Reservations" : "Guest Reservations"} ({receivedBookings.length})
           </button>
 
           <button
@@ -295,6 +396,20 @@ export default function DashboardPage() {
             <Compass className="w-4 h-4" />
             My Personal Trips ({myTrips.length})
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab("users")}
+              className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold transition shrink-0 ${
+                activeTab === "users"
+                  ? "bg-[#ff385c] text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-200/60"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Manage Users ({usersList.length})
+            </button>
+          )}
         </div>
 
         {/* Tab 1: Overview & Analytics */}
@@ -668,6 +783,124 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Tab 5: Platform User Management (Admin Only) */}
+        {activeTab === "users" && isAdmin && (
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm space-y-6 animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[#ff385c]" />
+                  Registered Platform Users & Role Assignment
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  As an Administrator, you can promote any user to Admin, assign Host (Owner) privileges, or demote to Guest.
+                </p>
+              </div>
+
+              {userRoleMessage && (
+                <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold border border-emerald-200 animate-in fade-in">
+                  ✓ {userRoleMessage}
+                </div>
+              )}
+            </div>
+
+            {usersList.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <p className="font-semibold text-sm">No registered users found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Current Role</th>
+                      <th className="py-3 px-4">Joined Date</th>
+                      <th className="py-3 px-4 text-right">Role Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-sm">
+                    {usersList.map((u) => (
+                      <tr key={u._id} className="hover:bg-gray-50/80 transition">
+                        <td className="py-4 px-4 font-semibold text-gray-900 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden relative shrink-0">
+                            <Image
+                              src={u.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
+                              alt={u.username}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-900">{u.username}</p>
+                            <p className="text-xs text-gray-400">ID: {u._id.slice(-6)}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-gray-600 font-medium">{u.email}</td>
+                        <td className="py-4 px-4">
+                          {u.role === "admin" && (
+                            <span className="bg-red-50 text-[#ff385c] font-bold text-xs px-2.5 py-1 rounded-full border border-red-200 inline-flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              ADMIN
+                            </span>
+                          )}
+                          {u.role === "owner" && (
+                            <span className="bg-amber-50 text-amber-700 font-bold text-xs px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1">
+                              <Home className="w-3.5 h-3.5" />
+                              HOST (OWNER)
+                            </span>
+                          )}
+                          {(!u.role || u.role === "user") && (
+                            <span className="bg-gray-100 text-gray-600 font-bold text-xs px-2.5 py-1 rounded-full border border-gray-200 inline-flex items-center gap-1">
+                              <User className="w-3.5 h-3.5" />
+                              GUEST (USER)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-xs text-gray-500">
+                          {new Date(u.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {u.role !== "admin" ? (
+                              <button
+                                onClick={() => handleRoleChange(u._id, "admin")}
+                                disabled={updatingUserRole === u._id}
+                                className="bg-[#ff385c] hover:bg-[#e00b41] text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm hover:scale-105 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Make Admin
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRoleChange(u._id, "user")}
+                                disabled={updatingUserRole === u._id || u.email === "admin@gmail.com"}
+                                className="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Demote to User
+                              </button>
+                            )}
+
+                            {u.role !== "owner" && u.role !== "admin" && (
+                              <button
+                                onClick={() => handleRoleChange(u._id, "owner")}
+                                disabled={updatingUserRole === u._id}
+                                className="bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                              >
+                                Make Host
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <Footer />

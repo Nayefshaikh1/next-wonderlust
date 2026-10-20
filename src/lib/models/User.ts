@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   avatar?: string;
+  role: "admin" | "owner" | "user";
   savedListings: mongoose.Types.ObjectId[];
   createdAt: Date;
 }
@@ -31,6 +32,11 @@ const UserSchema = new Schema<IUser>(
     avatar: {
       type: String,
       default: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80",
+    },
+    role: {
+      type: String,
+      enum: ["admin", "owner", "user"],
+      default: "user",
     },
     savedListings: [
       {

@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import PointerGuard from "@/components/PointerGuard";
-import ColorfulRipple from "@/components/ColorfulRipple";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,8 +31,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col relative">
-        <PointerGuard />
-        <ColorfulRipple />
         {children}
       </body>
     </html>

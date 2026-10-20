@@ -21,6 +21,8 @@ export async function GET() {
             username: user.username,
             email: user.email,
             avatar: user.avatar,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            role: (user as any).role || session.role || "user",
             savedListings: user.savedListings || [],
           }
         : null,

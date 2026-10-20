@@ -10,29 +10,45 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await connectToDatabase();
-    const currentUser = await getCurrentUser();
+    const session = await getCurrentUser();
 
-    if (!currentUser) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: "Unauthorized. Please log in." },
         { status: 401 }
       );
     }
 
-    const userId = currentUser.userId;
+    const User = (await import("@/lib/models/User")).default;
+    const dbUser = await User.findById(session.userId);
+    const role = dbUser?.role || session.role || "user";
 
-    // 1. Fetch listings owned by this user
-    // (If user owns none, fall back to sample listings for demonstration)
-    let userListings = await Listing.find({ owner: userId })
-      .populate("reviews")
-      .sort({ createdAt: -1 })
-      .lean();
+    // Guest users cannot access the dashboard
+    if (role === "user") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Access denied. Dashboard is restricted to Hosts (Owners) and Administrators.",
+          role: "user",
+        },
+        { status: 403 }
+      );
+    }
 
-    const isDemoHost = userListings.length === 0;
-    if (isDemoHost) {
-      // For rich demonstration when user hasn't created listings yet
+    const isAdmin = role === "admin";
+    const userId = session.userId;
+
+    // 1. Fetch listings:
+    // Admin sees ALL listings on the platform
+    // Owner sees ONLY listings they own
+    let userListings;
+    if (isAdmin) {
       userListings = await Listing.find({})
-        .limit(6)
+        .populate("reviews")
+        .sort({ createdAt: -1 })
+        .lean();
+    } else {
+      userListings = await Listing.find({ owner: userId })
         .populate("reviews")
         .sort({ createdAt: -1 })
         .lean();
@@ -40,12 +56,23 @@ export async function GET() {
 
     const listingIds = userListings.map((l) => l._id);
 
-    // 2. Fetch reservations received for these listings
-    const receivedBookings = await Booking.find({ listing: { $in: listingIds } })
-      .populate("listing")
-      .populate("buyer", "username email avatar")
-      .sort({ createdAt: -1 })
-      .lean();
+    // 2. Fetch reservations received for these listings:
+    // Admin sees ALL bookings platform-wide
+    // Owner sees ONLY reservations for their listings
+    let receivedBookings;
+    if (isAdmin) {
+      receivedBookings = await Booking.find({})
+        .populate("listing")
+        .populate("buyer", "username email avatar")
+        .sort({ createdAt: -1 })
+        .lean();
+    } else {
+      receivedBookings = await Booking.find({ listing: { $in: listingIds } })
+        .populate("listing")
+        .populate("buyer", "username email avatar")
+        .sort({ createdAt: -1 })
+        .lean();
+    }
 
     // 3. Fetch user's own booked trips as a guest
     const myTrips = await Booking.find({ buyer: userId })
@@ -57,9 +84,8 @@ export async function GET() {
     const totalListings = userListings.length;
     const totalReservations = receivedBookings.length;
     
-    // Total host earnings (sum of totalPrice from received bookings, or calculated estimate)
-    const rawEarnings = receivedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
-    const totalEarnings = rawEarnings > 0 ? rawEarnings : (isDemoHost ? userListings.reduce((sum, l) => sum + l.price * 3, 0) : 0);
+    // Total host earnings (sum of totalPrice from received bookings)
+    const totalEarnings = receivedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
     // Calculate average rating across listings
     let totalRatingSum = 0;
@@ -102,13 +128,14 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      role,
+      isAdmin,
       stats: {
         totalEarnings,
         totalReservations,
         totalListings,
         avgRating,
         occupancyRate: Math.min(94, Math.max(68, 75 + totalReservations * 2)),
-        isDemoHost,
       },
       userListings,
       receivedBookings,

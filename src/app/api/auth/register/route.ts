@@ -13,22 +13,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Please fill all required fields" }, { status: 400 });
     }
 
-    const existingUser = await User.findOne({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return NextResponse.json({ success: false, error: "Email is already registered" }, { status: 400 });
     }
 
+    const role = normalizedEmail === "admin@gmail.com" ? "admin" : "user";
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({
       username,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
+      role,
     });
 
     const token = signToken({
       userId: (newUser._id as import("mongoose").Types.ObjectId).toString(),
       email: newUser.email,
       username: newUser.username,
+      role,
+      avatar: newUser.avatar,
     });
 
     const response = NextResponse.json({
@@ -38,6 +43,7 @@ export async function POST(req: NextRequest) {
         username: newUser.username,
         email: newUser.email,
         avatar: newUser.avatar,
+        role,
       },
     });
 
