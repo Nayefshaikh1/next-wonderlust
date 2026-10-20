@@ -22,13 +22,47 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category");
     const query = searchParams.get("query");
     const maxPrice = searchParams.get("maxPrice");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "12", 10)));
+    const fetchAll = searchParams.get("all") === "true";
 
-    // Cache key based on query params
-    const cacheKey = `listings:${category || "all"}:${query || ""}:${maxPrice || ""}`;
-    const cachedData = await getCache(cacheKey);
+    // Cache key based on query params & pagination
+    const cacheKey = fetchAll
+      ? `listings:${category || "all"}:${query || ""}:${maxPrice || ""}:all`
+      : `listings:${category || "all"}:${query || ""}:${maxPrice || ""}:p${page}:l${limit}`;
 
-    if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
-      return NextResponse.json({ success: true, source: "redis_cache", listings: cachedData });
+    const cachedData = await getCache<{
+      listings: unknown[];
+      pagination: {
+        currentPage: number;
+        totalPages: number;
+        totalListings: number;
+        hasMore: boolean;
+        limit: number;
+      };
+    }>(cacheKey);
+
+    if (cachedData) {
+      if (Array.isArray(cachedData)) {
+        return NextResponse.json({
+          success: true,
+          source: "cache",
+          listings: cachedData,
+          pagination: {
+            currentPage: 1,
+            totalPages: 1,
+            totalListings: cachedData.length,
+            hasMore: false,
+            limit: cachedData.length,
+          },
+        });
+      }
+      return NextResponse.json({
+        success: true,
+        source: "cache",
+        listings: cachedData.listings,
+        pagination: cachedData.pagination,
+      });
     }
 
     try {
@@ -70,12 +104,23 @@ export async function GET(req: NextRequest) {
         filter.price = { $lte: Number(maxPrice) };
       }
 
-      const rawListings = await Listing.find(filter)
+      // Count total matches for pagination
+      const totalListings = await Listing.countDocuments(filter);
+      const totalPages = Math.ceil(totalListings / limit) || 1;
+      const skip = fetchAll ? 0 : (page - 1) * limit;
+
+      const queryBuilder = Listing.find(filter)
         .populate("reviews")
         .sort({ createdAt: -1 })
-        .lean();
+        .skip(skip);
 
-      if (rawListings && rawListings.length > 0) {
+      if (!fetchAll) {
+        queryBuilder.limit(limit);
+      }
+
+      const rawListings = await queryBuilder.lean();
+
+      if (rawListings) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const listings = rawListings.map((l: any) => ({
           ...l,
@@ -85,8 +130,22 @@ export async function GET(req: NextRequest) {
               : getCoordinatesForLocation(l.location, l.country),
         }));
 
-        await setCache(cacheKey, listings, 600);
-        return NextResponse.json({ success: true, source: "database", listings });
+        const pagination = {
+          currentPage: fetchAll ? 1 : page,
+          totalPages: fetchAll ? 1 : totalPages,
+          totalListings,
+          hasMore: fetchAll ? false : page < totalPages,
+          limit: fetchAll ? totalListings : limit,
+        };
+
+        await setCache(cacheKey, { listings, pagination }, 600);
+
+        return NextResponse.json({
+          success: true,
+          source: "database",
+          listings,
+          pagination,
+        });
       }
     } catch (dbErr) {
       console.warn("DB query failed, falling back to mock initial listings:", dbErr);
@@ -108,17 +167,37 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const totalFallback = fallback.length;
+    const totalFallbackPages = Math.ceil(totalFallback / limit) || 1;
+    const paginatedFallback = fetchAll
+      ? fallback
+      : fallback.slice((page - 1) * limit, page * limit);
+
     return NextResponse.json({
       success: true,
       source: "fallback_data",
-      listings: fallback.length > 0 ? fallback : MOCK_FALLBACK_LISTINGS,
+      listings: paginatedFallback,
+      pagination: {
+        currentPage: fetchAll ? 1 : page,
+        totalPages: fetchAll ? 1 : totalFallbackPages,
+        totalListings: totalFallback,
+        hasMore: fetchAll ? false : page < totalFallbackPages,
+        limit: fetchAll ? totalFallback : limit,
+      },
     });
   } catch (error) {
     console.error("GET Listings Error:", error);
     return NextResponse.json({
       success: true,
       source: "error_fallback",
-      listings: MOCK_FALLBACK_LISTINGS,
+      listings: MOCK_FALLBACK_LISTINGS.slice(0, 12),
+      pagination: {
+        currentPage: 1,
+        totalPages: Math.ceil(MOCK_FALLBACK_LISTINGS.length / 12),
+        totalListings: MOCK_FALLBACK_LISTINGS.length,
+        hasMore: true,
+        limit: 12,
+      },
     });
   }
 }
@@ -164,7 +243,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Invalidate Redis caches
+    // Invalidate Redis and in-memory caches
     await deleteCache("listings:*");
 
     return NextResponse.json({ success: true, listing: newListing }, { status: 201 });

@@ -1,28 +1,45 @@
 services:
-  # Next.js Application (Mapped to host port 3001)
+  # Nginx Reverse Proxy & Load Balancer
+  loadbalancer:
+    image: nginx:alpine
+    container_name: wonderlust-loadbalancer
+    ports:
+      - "3001:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    restart: always
+
+  # Next.js Application Cluster
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - MONGODB_URI=mongodb://mongo:27017/wonderlust
       - REDIS_URL=redis://redis:6379
-      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=dpkb3zfq4
-      - CLOUDINARY_API_KEY=185497795391743
-      - CLOUDINARY_API_SECRET=FMBJ_g3NlpaJwxjSMeBMSYXJdhg
-      - NEXT_PUBLIC_MAPTILER_KEY=M0zl0UMBnQpmCrDECyyV
-      - JWT_SECRET=gfgjkkiugjhfg
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=${NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - NEXT_PUBLIC_MAPTILER_KEY=${NEXT_PUBLIC_MAPTILER_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@gmail.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-password}
     depends_on:
       - mongo
       - redis
     restart: always
 
-  # Redis Cache Container (Mapped to host port 6380 to avoid host port conflicts)
+  # Redis Cache Container
   redis:
     image: redis:7-alpine
+    container_name: wonderlust-redis
     ports:
       - "6380:6379"
     volumes:
@@ -34,9 +51,10 @@ services:
       retries: 3
     restart: always
 
-  # MongoDB Container (Mapped to host port 27018 to avoid host port conflicts)
+  # MongoDB Database Container
   mongo:
     image: mongo:7.0
+    container_name: wonderlust-mongo
     ports:
       - "27018:27017"
     volumes:
