@@ -2,17 +2,41 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Menu, User, Heart, LogOut, Compass as AppLogo, LayoutDashboard, Compass, Home, ShieldCheck } from "lucide-react";
+import {
+  Search,
+  Menu,
+  User,
+  Heart,
+  LogOut,
+  Compass as AppLogo,
+  LayoutDashboard,
+  Compass,
+  Home,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-react";
 import AuthModal from "./AuthModal";
+import SearchFilterModal, { FilterState } from "./SearchFilterModal";
 
 interface NavbarProps {
   onSearch?: (query: string) => void;
+  onFilterChange?: (filters: FilterState) => void;
 }
 
-export default function Navbar({ onSearch }: NavbarProps) {
+export default function Navbar({ onSearch, onFilterChange }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<FilterState>({
+    destination: "",
+    minPrice: "",
+    maxPrice: "",
+    adults: 1,
+    children: 0,
+    amenities: [],
+  });
+
   const [currentUser, setCurrentUser] = useState<{
     id?: string;
     username: string;
@@ -54,12 +78,31 @@ export default function Navbar({ onSearch }: NavbarProps) {
     window.location.reload();
   };
 
+  const activeFilterCount =
+    (activeFilters.destination ? 1 : 0) +
+    (activeFilters.minPrice !== "" ? 1 : 0) +
+    (activeFilters.maxPrice !== "" ? 1 : 0) +
+    (activeFilters.adults > 1 || activeFilters.children > 0 ? 1 : 0) +
+    activeFilters.amenities.length;
+
+  const handleApplyFilters = (filters: FilterState) => {
+    setActiveFilters(filters);
+    setSearchQuery(filters.destination);
+    if (onFilterChange) {
+      onFilterChange(filters);
+    } else if (onSearch) {
+      onSearch(filters.destination);
+    }
+  };
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearch) {
+    if (onFilterChange) {
+      onFilterChange({ ...activeFilters, destination: searchQuery });
+    } else if (onSearch) {
       onSearch(searchQuery);
-      setIsMobileSearchOpen(false);
     }
+    setIsMobileSearchOpen(false);
   };
 
   return (
@@ -74,27 +117,63 @@ export default function Navbar({ onSearch }: NavbarProps) {
             <span className="inline">wonderlust</span>
           </Link>
 
-          {/* Desktop Search Bar (Authentic Airbnb 3-Pill Style) */}
-          <form onSubmit={handleSearchSubmit} className="hidden sm:flex flex-1 max-w-lg mx-2 sm:mx-0">
-            <div className="flex items-center border border-gray-300 hover:border-gray-400 hover:shadow-md transition duration-200 rounded-full py-1.5 px-4 shadow-2xs text-xs sm:text-sm cursor-pointer bg-white w-full divide-x divide-gray-200">
-              <input
-                type="text"
-                placeholder="Anywhere  ·  Any week  ·  Add guests"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent outline-none text-gray-900 placeholder-gray-700 font-semibold px-2 text-base sm:text-xs touch-manipulation truncate"
-              />
+          {/* Desktop Search Bar & Dedicated Filters Button */}
+          <div className="hidden sm:flex items-center gap-2.5 flex-1 max-w-xl mx-2 sm:mx-0">
+            <div
+              onClick={() => setIsFilterModalOpen(true)}
+              className="flex items-center border border-gray-300 hover:border-gray-400 hover:shadow-md transition duration-200 rounded-full py-1.5 px-4 shadow-2xs text-xs sm:text-sm cursor-pointer bg-white w-full divide-x divide-gray-200"
+            >
+              <div className="w-full flex items-center px-2 truncate">
+                <span className="text-gray-900 font-semibold text-xs truncate">
+                  {activeFilters.destination || "Anywhere"}
+                </span>
+                <span className="text-gray-300 mx-2">·</span>
+                <span className="text-gray-500 font-medium text-xs truncate">
+                  {activeFilters.minPrice !== "" || activeFilters.maxPrice !== ""
+                    ? `$${activeFilters.minPrice || 0} - $${activeFilters.maxPrice || "Any"}`
+                    : "Any price"}
+                </span>
+                <span className="text-gray-300 mx-2">·</span>
+                <span className="text-gray-500 font-medium text-xs truncate">
+                  {activeFilters.adults + activeFilters.children > 1
+                    ? `${activeFilters.adults + activeFilters.children} guests`
+                    : "Add guests"}
+                </span>
+              </div>
               <div className="pl-2 shrink-0">
                 <button
-                  type="submit"
-                  aria-label="Search listings"
-                  className="bg-[#ff385c] hover:bg-[#e00b41] text-white p-2 rounded-full transition flex items-center justify-center shrink-0 shadow-sm hover:scale-105 active:scale-95"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFilterModalOpen(true);
+                  }}
+                  aria-label="Open search filters"
+                  className="bg-[#ff385c] hover:bg-[#e00b41] text-white p-2 rounded-full transition flex items-center justify-center shrink-0 shadow-sm hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <Search className="w-3.5 h-3.5 stroke-[3]" />
                 </button>
               </div>
             </div>
-          </form>
+
+            {/* Dedicated Filters Button with Active Count Badge */}
+            <button
+              type="button"
+              onClick={() => setIsFilterModalOpen(true)}
+              className={`flex items-center gap-1.5 border rounded-full py-2 px-3.5 text-xs font-bold transition shadow-2xs cursor-pointer shrink-0 ${
+                activeFilterCount > 0
+                  ? "border-black bg-black text-white hover:bg-gray-800"
+                  : "border-gray-300 text-gray-700 hover:border-black bg-white"
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-[#ff385c] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
 
           {/* Desktop Right Navigation Profile Pill (Hidden on Mobile Top Header) */}
           <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
@@ -388,6 +467,14 @@ export default function Navbar({ onSearch }: NavbarProps) {
           </form>
         </div>
       )}
+
+      {/* Search & Filters Modal */}
+      <SearchFilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        initialFilters={activeFilters}
+        onApplyFilters={handleApplyFilters}
+      />
 
       {/* Auth Modal */}
       <AuthModal

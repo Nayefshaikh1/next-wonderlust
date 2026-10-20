@@ -7,7 +7,8 @@ import ListingGrid from "@/components/ListingGrid";
 import MapView from "@/components/MapView";
 import Footer from "@/components/Footer";
 import { ListingItem } from "@/components/ListingCard";
-import { Map as MapIcon, List as ListIcon } from "lucide-react";
+import { FilterState } from "@/components/SearchFilterModal";
+import { Map as MapIcon, List as ListIcon, X, SlidersHorizontal } from "lucide-react";
 
 export default function WonderlustHome() {
   const [selectedCategory, setSelectedCategory] = useState("Trending");
@@ -18,11 +19,21 @@ export default function WonderlustHome() {
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "map">("grid");
 
+  // Advanced Filters state
+  const [filters, setFilters] = useState<FilterState>({
+    destination: "",
+    minPrice: "",
+    maxPrice: "",
+    adults: 1,
+    children: 0,
+    amenities: [],
+  });
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalListings, setTotalListings] = useState(0);
-  const limit = 12;
+  const limit = 8;
 
   const contentTopRef = useRef<HTMLDivElement>(null);
 
@@ -34,9 +45,22 @@ export default function WonderlustHome() {
         if (selectedCategory && selectedCategory !== "Trending") {
           url.searchParams.set("category", selectedCategory);
         }
-        if (searchQuery) {
-          url.searchParams.set("query", searchQuery);
+
+        const effectiveQuery = filters.destination || searchQuery;
+        if (effectiveQuery) {
+          url.searchParams.set("query", effectiveQuery);
         }
+
+        if (filters.minPrice !== "") {
+          url.searchParams.set("minPrice", filters.minPrice.toString());
+        }
+        if (filters.maxPrice !== "") {
+          url.searchParams.set("maxPrice", filters.maxPrice.toString());
+        }
+        if (filters.amenities.length > 0) {
+          url.searchParams.set("amenities", filters.amenities.join(","));
+        }
+
         url.searchParams.set("page", pageToFetch.toString());
         url.searchParams.set("limit", limit.toString());
 
@@ -58,7 +82,7 @@ export default function WonderlustHome() {
         setIsLoading(false);
       }
     },
-    [selectedCategory, searchQuery, limit]
+    [selectedCategory, searchQuery, filters, limit]
   );
 
   // Fetch all listings for map mode so pins are complete
@@ -68,9 +92,22 @@ export default function WonderlustHome() {
       if (selectedCategory && selectedCategory !== "Trending") {
         url.searchParams.set("category", selectedCategory);
       }
-      if (searchQuery) {
-        url.searchParams.set("query", searchQuery);
+
+      const effectiveQuery = filters.destination || searchQuery;
+      if (effectiveQuery) {
+        url.searchParams.set("query", effectiveQuery);
       }
+
+      if (filters.minPrice !== "") {
+        url.searchParams.set("minPrice", filters.minPrice.toString());
+      }
+      if (filters.maxPrice !== "") {
+        url.searchParams.set("maxPrice", filters.maxPrice.toString());
+      }
+      if (filters.amenities.length > 0) {
+        url.searchParams.set("amenities", filters.amenities.join(","));
+      }
+
       url.searchParams.set("all", "true");
 
       const res = await fetch(url.toString());
@@ -81,9 +118,9 @@ export default function WonderlustHome() {
     } catch {
       setMapListings([]);
     }
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, filters]);
 
-  // Load listings on category or search query change (reset to page 1)
+  // Load listings on category or filter change
   useEffect(() => {
     let ignore = false;
     async function load() {
@@ -128,12 +165,43 @@ export default function WonderlustHome() {
     }
   };
 
+  const removeFilter = (filterKey: keyof FilterState, value?: string) => {
+    setFilters((prev) => {
+      if (filterKey === "amenities" && value) {
+        return { ...prev, amenities: prev.amenities.filter((a) => a !== value) };
+      }
+      if (filterKey === "minPrice" || filterKey === "maxPrice") {
+        return { ...prev, [filterKey]: "" };
+      }
+      if (filterKey === "destination") {
+        setSearchQuery("");
+        return { ...prev, destination: "" };
+      }
+      return prev;
+    });
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters =
+    Boolean(filters.destination) ||
+    filters.minPrice !== "" ||
+    filters.maxPrice !== "" ||
+    filters.adults > 1 ||
+    filters.children > 0 ||
+    filters.amenities.length > 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Authentic Airbnb Header Navbar */}
       <Navbar
         onSearch={(query) => {
           setSearchQuery(query);
+          setFilters((prev) => ({ ...prev, destination: query }));
+          setCurrentPage(1);
+        }}
+        onFilterChange={(newFilters) => {
+          setFilters(newFilters);
+          setSearchQuery(newFilters.destination);
           setCurrentPage(1);
         }}
       />
@@ -148,6 +216,82 @@ export default function WonderlustHome() {
         showTaxes={showTaxes}
         onToggleTaxes={(val) => setShowTaxes(val)}
       />
+
+      {/* Active Filter Chips Bar (Shown when search/filters are active) */}
+      {hasActiveFilters && (
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-8 py-2.5 flex items-center flex-wrap gap-2 border-b border-gray-100 bg-gray-50/50 w-full animate-in fade-in">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 mr-1">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#ff385c]" />
+            <span>Active Filters:</span>
+          </div>
+
+          {filters.destination && (
+            <span className="inline-flex items-center gap-1 bg-white border border-gray-200 text-gray-800 text-xs font-semibold px-3 py-1 rounded-full shadow-2xs">
+              Destination: {filters.destination}
+              <button
+                onClick={() => removeFilter("destination")}
+                className="hover:text-rose-500 transition cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {(filters.minPrice !== "" || filters.maxPrice !== "") && (
+            <span className="inline-flex items-center gap-1 bg-white border border-gray-200 text-gray-800 text-xs font-semibold px-3 py-1 rounded-full shadow-2xs">
+              Price: ${filters.minPrice || 0} - ${filters.maxPrice || "Any"}
+              <button
+                onClick={() => {
+                  removeFilter("minPrice");
+                  removeFilter("maxPrice");
+                }}
+                className="hover:text-rose-500 transition cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          )}
+
+          {(filters.adults > 1 || filters.children > 0) && (
+            <span className="inline-flex items-center gap-1 bg-white border border-gray-200 text-gray-800 text-xs font-semibold px-3 py-1 rounded-full shadow-2xs">
+              {filters.adults + filters.children} Guests
+            </span>
+          )}
+
+          {filters.amenities.map((amenity) => (
+            <span
+              key={amenity}
+              className="inline-flex items-center gap-1 bg-white border border-gray-200 text-gray-800 text-xs font-semibold px-3 py-1 rounded-full shadow-2xs"
+            >
+              {amenity}
+              <button
+                onClick={() => removeFilter("amenities", amenity)}
+                className="hover:text-rose-500 transition cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+
+          <button
+            onClick={() => {
+              setFilters({
+                destination: "",
+                minPrice: "",
+                maxPrice: "",
+                adults: 1,
+                children: 0,
+                amenities: [],
+              });
+              setSearchQuery("");
+              setCurrentPage(1);
+            }}
+            className="text-xs font-bold text-[#ff385c] hover:underline ml-2 cursor-pointer"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* Anchor for smooth scroll on pagination */}
       <div ref={contentTopRef} className="scroll-mt-36" />

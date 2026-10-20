@@ -21,15 +21,17 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
     const query = searchParams.get("query");
+    const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
+    const amenities = searchParams.get("amenities");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "12", 10)));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "8", 10)));
     const fetchAll = searchParams.get("all") === "true";
 
     // Cache key based on query params & pagination
     const cacheKey = fetchAll
-      ? `listings:${category || "all"}:${query || ""}:${maxPrice || ""}:all`
-      : `listings:${category || "all"}:${query || ""}:${maxPrice || ""}:p${page}:l${limit}`;
+      ? `listings:${category || "all"}:${query || ""}:${minPrice || ""}:${maxPrice || ""}:${amenities || ""}:all`
+      : `listings:${category || "all"}:${query || ""}:${minPrice || ""}:${maxPrice || ""}:${amenities || ""}:p${page}:l${limit}`;
 
     const cachedData = await getCache<{
       listings: unknown[];
@@ -100,8 +102,17 @@ export async function GET(req: NextRequest) {
         ];
       }
 
-      if (maxPrice) {
-        filter.price = { $lte: Number(maxPrice) };
+      if (minPrice || maxPrice) {
+        filter.price = {};
+        if (minPrice) filter.price.$gte = Number(minPrice);
+        if (maxPrice) filter.price.$lte = Number(maxPrice);
+      }
+
+      if (amenities) {
+        const amenityList = amenities.split(",").map((a) => a.trim()).filter(Boolean);
+        if (amenityList.length > 0) {
+          filter.amenities = { $all: amenityList.map((a) => new RegExp(a, "i")) };
+        }
       }
 
       // Count total matches for pagination
@@ -165,6 +176,21 @@ export async function GET(req: NextRequest) {
           item.country.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q)
       );
+    }
+    if (minPrice) {
+      fallback = fallback.filter((item) => item.price >= Number(minPrice));
+    }
+    if (maxPrice) {
+      fallback = fallback.filter((item) => item.price <= Number(maxPrice));
+    }
+    if (amenities) {
+      const amenityList = amenities.split(",").map((a) => a.trim().toLowerCase()).filter(Boolean);
+      if (amenityList.length > 0) {
+        fallback = fallback.filter((item) => {
+          const itemAmenities = (item.amenities || []).map((a) => a.toLowerCase());
+          return amenityList.every((reqA) => itemAmenities.some((ia) => ia.includes(reqA)));
+        });
+      }
     }
 
     const totalFallback = fallback.length;

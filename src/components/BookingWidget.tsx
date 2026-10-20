@@ -11,8 +11,22 @@ interface BookingWidgetProps {
 }
 
 export default function BookingWidget({ listingId, price, rating = "4.95", reviewCount = 12 }: BookingWidgetProps) {
-  const [checkIn, setCheckIn] = useState("2026-09-01");
-  const [checkOut, setCheckOut] = useState("2026-09-05");
+  const todayStr = new Date().toISOString().split("T")[0];
+  
+  const getTomorrowStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split("T")[0];
+  };
+
+  const getFourDaysLaterStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 5);
+    return d.toISOString().split("T")[0];
+  };
+
+  const [checkIn, setCheckIn] = useState(getTomorrowStr);
+  const [checkOut, setCheckOut] = useState(getFourDaysLaterStr);
   const [guests, setGuests] = useState(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -100,6 +114,7 @@ export default function BookingWidget({ listingId, price, rating = "4.95", revie
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-700">Check-in</label>
                 <input
                   type="date"
+                  min={todayStr}
                   value={checkIn}
                   onChange={(e) => setCheckIn(e.target.value)}
                   className="w-full bg-transparent text-xs font-medium text-gray-900 outline-none"
@@ -110,6 +125,7 @@ export default function BookingWidget({ listingId, price, rating = "4.95", revie
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-700">Check-out</label>
                 <input
                   type="date"
+                  min={checkIn || todayStr}
                   value={checkOut}
                   onChange={(e) => setCheckOut(e.target.value)}
                   className="w-full bg-transparent text-xs font-medium text-gray-900 outline-none"
