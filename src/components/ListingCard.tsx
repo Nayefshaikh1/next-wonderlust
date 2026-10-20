@@ -14,6 +14,10 @@ export interface ListingItem {
   category: string;
   location: string;
   country: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   host?: { isSuperhost?: boolean };
   reviews?: Array<{ rating: number }>;
 }

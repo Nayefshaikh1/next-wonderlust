@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import PhotoMosaic from "@/components/PhotoMosaic";
 import BookingWidget from "@/components/BookingWidget";
 import ReviewSection, { ReviewItem } from "@/components/ReviewSection";
+import MapView from "@/components/MapView";
 import { Star, Share, Heart, Award, Sparkles, MapPin, Wifi, Car, Utensils, Waves, Flame, Edit, Trash2 } from "lucide-react";
 
 interface SingleListing {
@@ -21,6 +22,10 @@ interface SingleListing {
   category: string;
   location: string;
   country: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   amenities?: string[];
   host?: { name: string; isSuperhost?: boolean; avatar?: string };
   reviews?: ReviewItem[];
@@ -302,6 +307,36 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             />
           </div>
 
+        </div>
+
+        {/* Where you'll be (Location & Interactive Map) */}
+        <div className="py-10 border-t border-gray-200 mt-12 space-y-4">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900">Where you&apos;ll be</h3>
+            <p className="text-gray-600 text-sm mt-1.5 flex items-center gap-1.5 font-medium">
+              <MapPin size={16} className="text-[#ff385c]" />
+              {listing.location}, {listing.country}
+            </p>
+          </div>
+
+          <div className="w-full h-[450px] rounded-2xl overflow-hidden border border-gray-200 shadow-sm relative">
+            <MapView
+              singleListing={{
+                _id: listing._id,
+                title: listing.title,
+                location: listing.location,
+                country: listing.country,
+                coordinates: listing.coordinates,
+                price: listing.price,
+                image: listing.image,
+              }}
+              className="w-full h-full"
+            />
+          </div>
+
+          <div className="pt-2 text-xs text-gray-500">
+            <span className="font-semibold text-gray-700">Location precision:</span> To protect host privacy, exact check-in address and directions are provided upon confirmed reservation.
+          </div>
         </div>
       </main>
 

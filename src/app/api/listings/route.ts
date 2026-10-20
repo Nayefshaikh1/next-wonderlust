@@ -5,6 +5,7 @@ import Review from "@/lib/models/Review";
 import { getCache, setCache, deleteCache } from "@/lib/redis";
 import { INITIAL_LISTINGS } from "@/lib/seed-data";
 import { getCurrentUser } from "@/lib/auth";
+import { getCoordinatesForLocation } from "@/lib/geo";
 
 export const dynamic = "force-dynamic";
 
@@ -69,12 +70,21 @@ export async function GET(req: NextRequest) {
         filter.price = { $lte: Number(maxPrice) };
       }
 
-      const listings = await Listing.find(filter)
+      const rawListings = await Listing.find(filter)
         .populate("reviews")
         .sort({ createdAt: -1 })
         .lean();
 
-      if (listings && listings.length > 0) {
+      if (rawListings && rawListings.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listings = rawListings.map((l: any) => ({
+          ...l,
+          coordinates:
+            l.coordinates?.lat && l.coordinates?.lng
+              ? l.coordinates
+              : getCoordinatesForLocation(l.location, l.country),
+        }));
+
         await setCache(cacheKey, listings, 600);
         return NextResponse.json({ success: true, source: "database", listings });
       }
@@ -134,6 +144,7 @@ export async function POST(req: NextRequest) {
       category: category || "Trending",
       location,
       country,
+      coordinates: body.coordinates || getCoordinatesForLocation(location, country),
       amenities: amenities || ["Wifi", "Kitchen", "Free parking"],
       host: {
         name: user?.username || "Wonderlust Host",

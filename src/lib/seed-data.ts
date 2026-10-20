@@ -1,4 +1,5 @@
 import { IListing } from "./models/Listing";
+import { getCoordinatesForLocation } from "./geo";
 
 export interface SeedItem {
   title: string;
@@ -9,6 +10,10 @@ export interface SeedItem {
   category: IListing["category"];
   location: string;
   country: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   amenities: string[];
   host: {
     name: string;
@@ -349,3 +354,10 @@ export const INITIAL_LISTINGS: SeedItem[] = [
     ]
   }
 ];
+
+// Ensure all items have accurate coordinates resolved
+INITIAL_LISTINGS.forEach((item) => {
+  if (!item.coordinates) {
+    item.coordinates = getCoordinatesForLocation(item.location, item.country);
+  }
+});

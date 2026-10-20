@@ -4,6 +4,7 @@ import Listing from "@/lib/models/Listing";
 import "@/lib/models/Review"; // ensure model is registered
 import { getCache, setCache, deleteCache } from "@/lib/redis";
 import { INITIAL_LISTINGS } from "@/lib/seed-data";
+import { getCoordinatesForLocation } from "@/lib/geo";
 
 export const dynamic = "force-dynamic";
 
@@ -35,9 +36,18 @@ export async function GET(
         return NextResponse.json({ success: true, source: "redis_cache", listing: cachedListing });
       }
 
-      const listing = await Listing.findById(id).populate("reviews").lean();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawListing: any = await Listing.findById(id).populate("reviews").lean();
 
-      if (listing) {
+      if (rawListing) {
+        const listing = {
+          ...rawListing,
+          coordinates:
+            rawListing.coordinates?.lat && rawListing.coordinates?.lng
+              ? rawListing.coordinates
+              : getCoordinatesForLocation(rawListing.location, rawListing.country),
+        };
+
         await setCache(cacheKey, listing, 3600);
         return NextResponse.json({ success: true, source: "database", listing });
       }

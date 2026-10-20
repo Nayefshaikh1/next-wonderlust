@@ -21,6 +21,10 @@ export interface IListing extends Document {
   category: "Trending" | "Rooms" | "Iconic Cities" | "Lakefront" | "Treehouses" | "Play" | "Castles" | "Amazing Pools" | "Camping" | "Farms" | "Arctic";
   location: string;
   country: string;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
   amenities: string[];
   host: IListingHost;
   reviews: mongoose.Types.ObjectId[];
@@ -78,6 +82,10 @@ const ListingSchema = new Schema<IListing>(
     country: {
       type: String,
       required: [true, "Country is required"],
+    },
+    coordinates: {
+      lat: { type: Number, default: 34.0259 },
+      lng: { type: Number, default: -118.7798 },
     },
     amenities: {
       type: [String],
